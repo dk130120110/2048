@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    #box {
+      position: relative;
+      border: 1px solid #ccc;
+      margin: 0 auto;
+    }
+
+    #box div {
+      transition: all 1s;
+      position: absolute;
+      border-radius: 6px;
+      background-color: #58bc58;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-weight: 600;
+      font-size: 28px;
+    }
+
+    .ctrl {
+      margin: 30px auto 0;
+      display: flex;
+      width: 240px;
+    }
+
+    .ctrl div {
+      margin-right: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      line-height: 40px;
+      text-align: center;
+      background-color: #58bc58;
+      color: #fff;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div id='box'></div>
+  <div class='ctrl'>
+    <div class='left'>左</div>
+    <div class='right'>右</div>
+    <div class='top'>上</div>
+    <div class='bottom'>下</div>
+  </div>
+</body>
+<script>
+  class TwoZeroFourEight {
+    constructor(el, size) {
+      this.el = el; // 父盒子
+      this.size = size; // 盒子大小
+      this.flag = true; // 防止连点
+      this.init()
+    }
+    init() {
+      this.el.style.width = this.size + 'px';
+      this.el.style.height = this.size + 'px';
+      this.side = this.size / 4;
+      this.place = []; // 剩余位置
+      this.origin = []; // 全部位置
+      for (let i = 0; i < this.size; i += this.side) {
+        for (let j = 0; j < this.size; j += this.side) {
+          this.place.push({ x: i, y: j })
+          this.origin.push({ x: i, y: j })
+        }
+      }
+      this.start();
+    }
+    start() {
+      this.create()
+      this.create()
+    }
+    create() {
+      const idx = ~~(Math.random() * this.place.length);
+      const target = this.place.splice(idx, 1)[0];
+      const div = document.createElement('div');
+      div.style.width = this.side + 'px';
+      div.style.height = this.side + 'px';
+      div.style.top = target.y + 'px';
+      div.style.left = target.x + 'px';
+      div.dataset.top = target.y;
+      div.dataset.left = target.x;
+      div.dataset.html = 2;
+      div.innerHTML = 2;
+      this.el.appendChild(div);
+    }
+    run(forward) {
+      // 操作间隔1.2秒
+      if(!this.flag) return;
+      this.flag = false;
+      setTimeout(() => { this.flag = true; }, 1200);
+
+      const attr = forward === 'left' || forward === 'right' ? 'left' : 'top'; // 纵向为left，竖向为top
+      const dire = forward === 'right' || forward === 'bottom'; // 正方向为true，负方向为false
+      const divs = Array.from(this.el.children);
+      // 找出现有方块的坐标
+      const diff = divs.map((div) => {
+        return {
+          x: div.dataset.left * 1,
+          y: div.dataset.top * 1,
+        }
+      })
+      // 定坐标，碰撞前
+      divs.forEach((div) => {
+        const left = parseInt(getComputedStyle(div, null).left);
+        const top = parseInt(getComputedStyle(div, null).top);
+        let sum = dire ? 3 : 0;
+        diff.forEach((item) => {
+          const flagX = dire ? left < item.x : left > item.x;
+          const flagY = dire ? top < item.y : top > item.y;
+          if ((attr === 'left' && top === item.y && flagX) || (attr === 'top' && left === item.x && flagY)) {
+            sum = dire ? sum - 1 : sum + 1;
+          }
+        })
+        div.dataset[attr] = sum * 100;
+      })
+      // 定坐标，碰撞后（处理合并情况）
+      const change = []; // 碰撞变动量（记录合并位置）
+      const reset = []; // 修改变动量（修改合并位置）
+      divs.forEach((div) => {
+        if(div.dataset.destory) return; // todo
+        const { top, html, left } = div.dataset;
+        divs.forEach((_div) => {
+          const { top: _top, html: _html, left: _left } = _div.dataset;
+          const flagX = dire ? _left - left === 100 : left - _left === 100;
+          const flagY = dire ? _top - top === 100 : top - _top === 100;
+          if ((attr === 'left' && top === _top && html === _html && flagX) || (attr === 'top' && left === _left && html === _html && flagY)) {
+            // todo
+            if (div.dataset.destory) {
+              reset.push({
+                top: attr === 'left' ? div.dataset.top : (dire ? div.dataset.top - 100 : div.dataset.top + 100),
+                left: attr === 'left' ? (dire ? div.dataset.left - 100 : div.dataset.left + 100) : div.dataset.left,
+              })
+            }
+            change.push({
+              top: div.dataset.top,
+              left: div.dataset.left,
+            })
+            div.dataset[attr] = dire ? div.dataset[attr] * 1 + 100 : div.dataset[attr] * 1 - 100;
+            div.dataset.html = div.dataset.html * 2;
+            _div.dataset.destory = 'true';
+            // !div.dataset.destory && (div.dataset.html = div.dataset.html * 2);
+            // delete div.dataset.destory; // todo
+          }
+        })
+      })
+      // change.forEach((item, idx) => {
+      //   reset.forEach((_item) => {
+      //     if (item.top === _item.top && item.left === _item.left) {
+      //       console.log(idx);
+      //       change.splice(idx, 1);
+      //     }
+      //   })
+      // })
+      // 定坐标，碰撞后（处理合并后后方方块位移）
+      divs.forEach((div) => {
+        change.forEach((item) => {
+          const flagX = dire ? div.dataset.left < item.left : div.dataset.left > item.left;
+          const flagY = dire ? div.dataset.top < item.top : div.dataset.top > item.top;
+          if ((attr === 'left' && div.dataset.top === item.top && flagX) || (attr === 'top' && div.dataset.left === item.left && flagY)) {
+            div.dataset[attr] = dire ? div.dataset[attr] * 1 + 100 : div.dataset[attr] * 1 - 100;
+          }
+        })
+      })
+      // divs.forEach((div) => {
+      //   let flag = true;
+      //   reset.forEach((item) => {
+      //     console.log('a');
+      //     if(div.dataset.top === item.top && div.dataset.left === item.left){
+      //       div.dataset.html /= 2;
+      //       flag = false;
+      //     }
+      //   })
+      //   flag && (delete div.dataset.destory)
+      // })
+      // 修改剩余位置
+      this.place = [];
+      this.origin.forEach((item) => {
+        let flag = true;
+        divs.forEach((div) => {
+          if (item.x === div.dataset.left * 1 && item.y === div.dataset.top * 1) {
+            flag = false;
+          }
+        })
+        flag && this.place.push({ x: item.x, y: item.y})
+      })
+      // 移动
+      divs.forEach((div) => {
+        div.style[attr] = div.dataset[attr] + 'px';
+        setTimeout(() => {
+          div.innerHTML = div.dataset.html;
+        }, 1000)
+        if (div.dataset.destory === 'true') {
+          setTimeout(() => {
+            this.el.removeChild(div)
+          }, 1000)
+        }
+      })
+      // 移动后若剩余位置为0，结束游戏
+      if (this.place.length === 0) {
+        this.over()
+        return;
+      }
+      // 移动完成后生成方块
+      setTimeout(() => {
+        this.create();
+      }, 1000);
+    }
+    over() {
+      console.log('game over')
+    }
+  }
+  const app = new TwoZeroFourEight(document.querySelector('#box'), 400);
+
+  document.querySelector('.ctrl').onclick = function(e) {
+    app.run(e.target.className)
+  }
+</script>
+</html>
